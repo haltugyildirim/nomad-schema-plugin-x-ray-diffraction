@@ -1,3 +1,3 @@
 data:
-  m_def: nomadschemaexample.ExampleSection
-  name: Markus
+  m_def: nomadschemaexample.GenericXRD
+  data_file: ../upload/raw/2theta-omega.xrdml
