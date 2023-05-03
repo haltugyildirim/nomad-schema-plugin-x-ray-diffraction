@@ -1,4 +1,4 @@
-from nomad.metainfo import Quantity, Package, SubSection, MEnum
+from nomad.metainfo import Quantity, Package, SubSection, MEnum, Section
 from nomad.datamodel.data import EntryData, ArchiveSection
 from nomad.datamodel.metainfo.annotations import ELNAnnotation, ELNComponentEnum
 from nomad.datamodel.metainfo.eln import Measurement
@@ -30,38 +30,40 @@ def calculate_two_theta_or_scattering_vector(q=None, two_theta=None, wavelength=
     else:
         raise ValueError("Either q or two_theta must be provided.")
 
+def estimate_kalpha_wavelengths(source_material):
+    """
+    Estimate the K-alpha1 and K-alpha2 wavelengths of an X-ray source given the material of the source.
+
+    Args:
+        source_material (str): Material of the X-ray source, such as 'Cu', 'Fe', 'Mo', 'Ag', 'In', 'Ga', etc.
+
+    Returns:
+        Tuple[float, float]: Estimated K-alpha1 and K-alpha2 wavelengths of the X-ray source, in angstroms.
+    """
+    # Dictionary of K-alpha1 and K-alpha2 wavelengths for various X-ray source materials, in angstroms
+    kalpha_wavelengths = {
+        'Cr': (2.2910, 2.2936),
+        'Fe': (1.9359, 1.9397),
+        'Cu': (1.5406, 1.5444),
+        'Mo': (0.7093, 0.7136),
+        'Ag': (0.5594, 0.5638),
+        'In': (0.6535, 0.6577),
+        'Ga': (1.2378, 1.2443)
+    }
+
+    try:
+        kalpha1_wavelength, kalpha2_wavelength = kalpha_wavelengths[source_material]
+    except KeyError:
+        raise ValueError("Unknown X-ray source material.")
+
+    return kalpha1_wavelength, kalpha2_wavelength
+
 
 class XRayConventionalSource(ArchiveSection):
     '''
     X-ray source used in conventional diffractometers
     '''
-    def estimate_kalpha_wavelengths(self, source_material):
-        """
-        Estimate the K-alpha1 and K-alpha2 wavelengths of an X-ray source given the material of the source.
 
-        Args:
-            source_material (str): Material of the X-ray source, such as 'Cu', 'Fe', 'Mo', 'Ag', 'In', 'Ga', etc.
-
-        Returns:
-            Tuple[float, float]: Estimated K-alpha1 and K-alpha2 wavelengths of the X-ray source, in angstroms.
-        """
-        # Dictionary of K-alpha1 and K-alpha2 wavelengths for various X-ray source materials, in angstroms
-        kalpha_wavelengths = {
-            'Cr': (2.2910, 2.2936),
-            'Fe': (1.9359, 1.9397),
-            'Cu': (1.5406, 1.5444),
-            'Mo': (0.7093, 0.7136),
-            'Ag': (0.5594, 0.5638),
-            'In': (0.6535, 0.6577),
-            'Ga': (1.2378, 1.2443)
-        }
-
-        try:
-            kalpha1_wavelength, kalpha2_wavelength = kalpha_wavelengths[source_material]
-        except KeyError:
-            raise ValueError("Unknown X-ray source material.")
-
-        return kalpha1_wavelength, kalpha2_wavelength
 
     xray_tube_material = Quantity(
         type=MEnum(sorted(['Cu', 'Cr', 'Mo', 'Fe', 'Ag', 'In', 'Ga'])),
@@ -106,14 +108,8 @@ class XRayConventionalSource(ArchiveSection):
         unit='angstrom',
         description='Wavelength of the Kβ line')
 
-    def normalize(self, archive, logger):
-        super(XRayConventionalSource, self).normalize(archive, logger)
 
-        if self.xray_tube_material is not None:
-            self.kalpha_one, self.kalpha_two = self.estimate_kalpha_wavelengths(self.xray_tube_material)
-
-
-class XRayDiffraction(Measurement):
+class GenericXRD(Measurement):
     '''
     X-ray diffraction is a technique typically used to characterize the structural
     properties of crystalline materials. The data contains `two_theta` values of the scan
@@ -189,8 +185,77 @@ class XRayDiffraction(Measurement):
         shape=['*'],
         description='Integration time per channel')
 
+
+class XRayDiffractionWithSource(GenericXRD):
+
+    source = SubSection(section_def=XRayConventionalSource)
+
+
+class XRayDiffraction(XRayDiffractionWithSource, EntryData):
+    '''
+    Generic X-ray diffraction measurement.
+    '''
+    m_def = Section(
+        a_eln=dict(lane_width='600px'),
+        a_plot=[
+            {
+                'label': 'XRD linear scale',
+                'x': 'two_theta',
+                'y': 'intensity',
+                'layout': {'yaxis': {'type': 'lin'}},
+            },
+            {
+                'label': 'XRD log scale',
+                'x': 'two_theta',
+                'y': 'intensity',
+                'layout': {'yaxis': {'type': 'log'}},
+                'config': {"editable": 'false'},
+            }])
+    
+    data_file = Quantity(
+        type=str,
+        description='Data file containing the difractogram',
+        a_eln=dict(
+            component='FileEditQuantity',
+        )
+    )
+
     def normalize(self, archive, logger):
         super(XRayDiffraction, self).normalize(archive, logger)
+
+        # Use the xrd parser to populate the schema reading the data file
+        if not self.data_file:
+            return
+
+        with archive.m_context.raw_file(self.data_file) as file:
+            xrd_dict = parse_and_convert_file(file.name)
+            self.intensity = xrd_dict['counts'] if xrd_dict['counts'] is not None else None
+            self.two_theta = xrd_dict['2Theta'] * ureg('degree') if xrd_dict['2Theta'] is not None else None
+            self.omega = xrd_dict['Omega'] * ureg('degree') if xrd_dict['Omega'] is not None else None
+            self.chi = xrd_dict['Chi'] * ureg('degree') if xrd_dict['Chi'] is not None else None
+            self.phi = xrd_dict['Phi'] * ureg('degree') if xrd_dict['Phi'] is not None else None
+            if self.source is None:
+                self.source = XRayConventionalSource()
+            self.source.xray_tube_material = xrd_dict['metadata']['wavelength']['anode_material'] if xrd_dict['metadata']['wavelength']['anode_material'] is not None else None
+            # self.source_peak_wavelength = xrd_dict['metadata']['wavelength']['kalpha_one']
+            # self.kalpha_one = xrd_dict['kAlpha1']
+            # self.kalpha_two = xrd_dict['kAlpha2']
+            # self.ratio_kalphatwo_kalphaone = xrd_dict['kAlphaRatio']
+            # self.kbeta = xrd_dict['kBeta']
+            # self.scan_axis = xrd_dict['scanAxis']
+            self.integration_time = xrd_dict['countTime'] * ureg('second') if xrd_dict['countTime'] is not None else None
+            
+        if self.source.xray_tube_material is not None:
+            xray_tube_material = self.source.xray_tube_material
+            self.source.kalpha_one, self.source.kalpha_two = estimate_kalpha_wavelengths(source_material=xray_tube_material)
+        try:
+            if self.source.kalpha_one is not None:
+                self.source_peak_wavelength = self.source.kalpha_one
+            else:
+                logger.warning("Unable to set source_peak_wavelegth because source.kalpha_one is None")
+        except Exception:
+            logger.warning("Unable to set source_peak_wavelegth")
+
         try:
             if self.source_peak_wavelength is not None and self.q_vector is not None:
                 self.two_theta = calculate_two_theta_or_scattering_vector(
@@ -201,67 +266,10 @@ class XRayDiffraction(Measurement):
                     two_theta=self.two_theta, wavelength=self.source_peak_wavelength)
         except Exception:
             logger.warning("Unable to convert from two_theta to q_vector vice-versa")
-
-
-class XRayDiffractionWithSource(XRayDiffraction):
-
-    source = SubSection(section_def=XRayConventionalSource)
-
-    def normalize(self, archive, logger):
-        # this normalize section should copy the kalpha_one into the source_peak_wavelength
-
-        try:
-            if self.source.kalpha_one is not None:
-                self.source_peak_wavelength = self.source.kalpha_one
-            else:
-                logger.warning("Unable to set source_peak_wavelegth because source.kalpha_one is None")
-        except Exception:
-            logger.warning("Unable to set source_peak_wavelegth")
-
-        super(XRayDiffractionWithSource, self).normalize(archive, logger)
-
-
-class GenericXRD(XRayDiffractionWithSource, EntryData):
-    '''
-    Generic X-ray diffraction measurement.
-    '''
-
-    data_file = Quantity(
-        type=str,
-        description='Data file containing the difractogram',
-        a_eln=dict(
-            component='FileEditQuantity',
-        )
-    )
-
-    def normalize(self, archive, logger):
-        super(GenericXRD, self).normalize(archive, logger)
-
-        # Use the xrd parser to populate the schema reading the data file
-        if not self.data_file:
-            return
-
-        with archive.m_context.raw_file(self.data_file) as file:
-            xrd_dict = parse_and_convert_file(file.name)
-            self.intensity = xrd_dict['counts'] if xrd_dict['counts'] is not None else None
-            self.two_theta = xrd_dict['2Theta'] * ureg('degree')
-            self.omega = xrd_dict['Omega'] * ureg('degree')
-            self.chi = xrd_dict['Chi'] * ureg('degree')
-            self.phi = xrd_dict['Phi'] * ureg('degree')
-            if self.source is None:
-                self.source = XRayConventionalSource()
-            self.source.xray_tube_material = xrd_dict['metadata']['wavelength']['anode_material']
-            self.source_peak_wavelength = xrd_dict['metadata']['wavelength']['kalpha_one']
-            # self.kalpha_one = xrd_dict['kAlpha1']
-            # self.kalpha_two = xrd_dict['kAlpha2']
-            # self.ratio_kalphatwo_kalphaone = xrd_dict['kAlphaRatio']
-            # self.kbeta = xrd_dict['kBeta']
-            # self.scan_axis = xrd_dict['scanAxis']
-            self.integration_time = xrd_dict['countTime']
-
-
+            
+            
 m_package.__init_metainfo__()
 
 # testing the parser
-data_file = '/home/pepe_marquez/nomad-plugins/nomad-schema-plugin-x-ray-diffraction/tests/data/2theta-omega.xrdml'
-print(parse_and_convert_file(data_file))
+# data_file = '/home/pepe_marquez/nomad-plugins/nomad-schema-plugin-x-ray-diffraction/tests/data/2theta-omega.xrdml'
+# print(parse_and_convert_file(data_file))

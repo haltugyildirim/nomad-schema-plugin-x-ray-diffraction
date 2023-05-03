@@ -1,3 +1,3 @@
 data:
-  m_def: nomadschemaxrd.GenericXRD
+  m_def: nomadschemaxrd.XRayDiffraction
   data_file: 2theta-omega.xrdml
