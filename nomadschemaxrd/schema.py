@@ -4,7 +4,7 @@ from nomad.datamodel.metainfo.annotations import ELNAnnotation, ELNComponentEnum
 from nomad.datamodel.metainfo.eln import Measurement
 from nomad.units import ureg
 import numpy as np
-from xrd_parser import parse_and_convert_file
+from nomadschemaxrd.xrd_parser import parse_and_convert_file
 
 
 m_package = Package()
@@ -243,9 +243,15 @@ class GenericXRD(XRayDiffractionWithSource, EntryData):
 
         with archive.m_context.raw_file(self.data_file) as file:
             xrd_dict = parse_and_convert_file(file.name)
-            self.intensity = xrd_dict['counts']
+            self.intensity = xrd_dict['counts'] if xrd_dict['counts'] is not None else None
             self.two_theta = xrd_dict['2Theta'] * ureg('degree')
             self.omega = xrd_dict['Omega'] * ureg('degree')
+            self.chi = xrd_dict['Chi'] * ureg('degree')
+            self.phi = xrd_dict['Phi'] * ureg('degree')
+            if self.source is None:
+                self.source = XRayConventionalSource()
+            self.source.xray_tube_material = xrd_dict['metadata']['wavelength']['anode_material']
+            self.source_peak_wavelength = xrd_dict['metadata']['wavelength']['kalpha_one']
             # self.kalpha_one = xrd_dict['kAlpha1']
             # self.kalpha_two = xrd_dict['kAlpha2']
             # self.ratio_kalphatwo_kalphaone = xrd_dict['kAlphaRatio']
