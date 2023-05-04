@@ -44,14 +44,12 @@ class PanalyticalXRDMLParser:
             # "diffractometer_system": root.find(".//{http://www.xrdml.com/XRDMeasurement/2.1}entry[@name='Diffractometer system']").text,
             "measurement_type": xrd_measurement.get("measurementType"),
             "sample_mode": xrd_measurement.get("sampleMode"),
-            "wavelength": {
-                "kAlpha1": float(xrd_measurement.find(".//{http://www.xrdml.com/XRDMeasurement/2.1}kAlpha1").text),
-                "kAlpha2": float(xrd_measurement.find(".//{http://www.xrdml.com/XRDMeasurement/2.1}kAlpha2").text),
-                "anode_material": xrd_measurement.find(".//{http://www.xrdml.com/XRDMeasurement/2.1}anodeMaterial").text,
-            },
             "source": {
                 "voltage": float(xrd_measurement.find(".//{http://www.xrdml.com/XRDMeasurement/2.1}tension").text),
                 "current": float(xrd_measurement.find(".//{http://www.xrdml.com/XRDMeasurement/2.1}current").text),
+                "kAlpha1": float(xrd_measurement.find(".//{http://www.xrdml.com/XRDMeasurement/2.1}kAlpha1").text),
+                "kAlpha2": float(xrd_measurement.find(".//{http://www.xrdml.com/XRDMeasurement/2.1}kAlpha2").text),
+                "anode_material": xrd_measurement.find(".//{http://www.xrdml.com/XRDMeasurement/2.1}anodeMaterial").text,
             },
             "scan_mode": xrd_measurement.find(".//{http://www.xrdml.com/XRDMeasurement/2.1}scan").get("mode"),
             "scan_axis": xrd_measurement.find(".//{http://www.xrdml.com/XRDMeasurement/2.1}scan").get("scanAxis"),

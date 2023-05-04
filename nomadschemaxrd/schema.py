@@ -140,7 +140,7 @@ class GenericXRD(Measurement):
         })
 
     q_vector = Quantity(
-        type=np.dtype(np.float64), shape=['n_values'],
+        type=np.dtype(np.float64), shape=['*'],
         unit='meter**(-1)',
         description='The scattering vector *Q* of the difractogram',
         a_plot={
@@ -148,24 +148,24 @@ class GenericXRD(Measurement):
         })
 
     intensity = Quantity(
-        type=np.dtype(np.float64), shape=['n_values'],
+        type=np.dtype(np.float64), shape=['*'],
         description='The count at each 2-theta value, dimensionless',
         a_plot={
             'x': 'two_theta', 'y': 'intensity'
         })
 
     omega = Quantity(
-        type=np.dtype(np.float64), shape=['n_values'],
+        type=np.dtype(np.float64), shape=['*'],
         unit='deg',
         description='The omega range of the difractogram')
 
     phi = Quantity(
-        type=np.dtype(np.float64), shape=['n_values'],
+        type=np.dtype(np.float64), shape=['*'],
         unit='deg',
         description='The phi range of the difractogram')
 
     chi = Quantity(
-        type=np.dtype(np.float64), shape=['n_values'],
+        type=np.dtype(np.float64), shape=['*'],
         unit='deg',
         description='The chi range of the difractogram')
 
@@ -196,12 +196,16 @@ class XRayDiffraction(XRayDiffractionWithSource, EntryData):
     Generic X-ray diffraction measurement.
     '''
     m_def = Section(
-        a_eln=dict(lane_width='600px'),
+        a_eln=dict(lane_width='600px', 
+                   include=['name'],
+                   exclude=['lab_id', 'datetime', 'end_time', 'description']),
+                    
+                    #    visible = ['name', 'lab_id', 'datetime', 'end_time', 'description']))
         a_plot=[
             {
                 'label': 'XRD linear scale',
                 'x': 'two_theta',
-                'y': 'intensity',
+                'y': ['intensity'],
                 'layout': {'yaxis': {'type': 'lin'}},
             },
             {
@@ -236,7 +240,7 @@ class XRayDiffraction(XRayDiffractionWithSource, EntryData):
             self.phi = xrd_dict['Phi'] * ureg('degree') if xrd_dict['Phi'] is not None else None
             if self.source is None:
                 self.source = XRayConventionalSource()
-            self.source.xray_tube_material = xrd_dict['metadata']['wavelength']['anode_material'] if xrd_dict['metadata']['wavelength']['anode_material'] is not None else None
+            self.source.xray_tube_material = xrd_dict['metadata']['source']['anode_material'] if xrd_dict['metadata']['source']['anode_material'] is not None else None
             # self.source_peak_wavelength = xrd_dict['metadata']['wavelength']['kalpha_one']
             # self.kalpha_one = xrd_dict['kAlpha1']
             # self.kalpha_two = xrd_dict['kAlpha2']

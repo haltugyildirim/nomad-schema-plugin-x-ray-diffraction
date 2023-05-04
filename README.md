@@ -1,7 +1,35 @@
-# NOMAD's schema example plugin
+# NOMAD's schema X-Ray Diffraction (XRD) plugin
 
 ## Getting started
 
+This plugin is WiP and an initial test. At bthe moment is only supportin `.xrdml` files.
+
+There are conflicting dependencies with the current NOMAD `develop` branch.
+To test it in dev mode, you need to do the following in your NOMAD installation:
+
+```python
+pip install xrayutilities
+pip install numpy 1.24.3
+pip install numba --upgrade
+```
+then your nomad.yaml in your installation should have this:
+```yaml
+keycloak:
+  realm_name: fairdi_nomad_test
+plugins:
+  # We only include our schema here. Without the explicit include, all plugins will be
+  # loaded. Many build in plugins require more dependencies. Install nomad-lab[parsing]
+  # to make all default plugins work.
+  include: 'schemas/nomadschemaxrd'
+  options:
+    schemas/nomadschemaxrd:
+      python_package: nomadschemaxrd
+```
+do not forget to export the package in the same terminal where you run `nomad admin run appworker`: 
+```python
+export PYTHONPATH="$PYTHONPATH:/your/path/nomad-to/nomad-schema-plugin-x-ray-diffraction"
+```
+Use the path where you cloned this repo.
 ### Fork the project
 
 Go to the github project page https://github.com/nomad-coe/nomad-schema-plugin-example, hit
