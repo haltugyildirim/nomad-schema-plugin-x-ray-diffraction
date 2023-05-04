@@ -2,16 +2,17 @@
 
 ## Getting started
 
-This plugin is WiP and an initial test. At bthe moment is only supportin `.xrdml` files.
+This plugin is  work in progress and an initial test. At the moment is only supporting `.xrdml` files.
 
 There are conflicting dependencies with the current NOMAD `develop` branch.
 To test it in dev mode, you need to do the following in your NOMAD installation:
 
 ```python
 pip install xrayutilities
-pip install numpy 1.24.3
+pip install numpy==1.24.3
 pip install numba --upgrade
 ```
+You might get some complains saying that `scipy` needs to be upgraded too, but this should get the plugin working.
 then your nomad.yaml in your installation should have this:
 ```yaml
 keycloak:
@@ -25,12 +26,14 @@ plugins:
     schemas/nomadschemaxrd:
       python_package: nomadschemaxrd
 ```
-do not forget to export the package in the same terminal where you run `nomad admin run appworker`: 
+do not forget to export the package in the same terminal where you run NOMAD (`nomad admin run appworker`): 
 ```python
 export PYTHONPATH="$PYTHONPATH:/your/path/nomad-to/nomad-schema-plugin-x-ray-diffraction"
 ```
 Use the path where you cloned this repo.
-### Fork the project
+
+## Instructions of the exmaple plugin :point_down:
+### Fork the project and check the original plugin example
 
 Go to the github project page https://github.com/nomad-coe/nomad-schema-plugin-example, hit
 fork (and leave a star, thanks!). Maybe you want to rename the project while forking!
@@ -92,4 +95,4 @@ You can now start to develop you schema. Here are a few things that you might wa
 - When you change module and class names, make sure to update the `nomad_plugin.yaml` accordingly.
 
 To learn more about plugins, how to add them to an Oasis, how to publish them, read our
-documentation on plugins: https://nomad-lab/prod/v1/staging/docs/plugins.html
+documentation on plugins: https://nomad-lab.eu/prod/v1/staging/docs/plugins.html
