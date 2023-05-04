@@ -1,7 +1,7 @@
 from nomad.metainfo import Quantity, Package, SubSection, MEnum, Section
 from nomad.datamodel.data import EntryData, ArchiveSection
 from nomad.datamodel.metainfo.annotations import ELNAnnotation, ELNComponentEnum
-from nomad.datamodel.metainfo.eln import Measurement
+from nomad.datamodel.metainfo.eln import Measurement, Chemical
 from nomad.units import ureg
 import numpy as np
 from nomadschemaxrd.xrd_parser import parse_and_convert_file
@@ -191,29 +191,29 @@ class XRayDiffractionWithSource(GenericXRD):
     source = SubSection(section_def=XRayConventionalSource)
 
 
-class XRayDiffraction(XRayDiffractionWithSource, EntryData):
+class XRayDiffraction(XRayDiffractionWithSource, Chemical, EntryData):
     '''
     Generic X-ray diffraction measurement.
     '''
     m_def = Section(
-        a_eln=dict(lane_width='600px', 
-                   include=['name'],
-                   exclude=['lab_id', 'datetime', 'end_time', 'description']),
-                    
-                    #    visible = ['name', 'lab_id', 'datetime', 'end_time', 'description']))
+        a_eln=dict(lane_width='800px',
+                   properties=dict(
+                       visible=dict(
+                           include=['data_file', 'chemical_formula']),
+                       editable=dict(
+                           exclude=["location"]))),                  
         a_plot=[
             {
-                'label': 'XRD linear scale',
+                'label': 'Intensity (log scale)',
                 'x': 'two_theta',
                 'y': ['intensity'],
-                'layout': {'yaxis': {'type': 'lin'}},
+                'layout': {'yaxis': {'type': 'log'}},
             },
             {
-                'label': 'XRD log scale',
+                'label': 'Intensity (lin scale)',
                 'x': 'two_theta',
                 'y': 'intensity',
-                'layout': {'yaxis': {'type': 'log'}},
-                'config': {"editable": 'false'},
+                'layout': {'yaxis': {'type': 'lin'}},
             }])
     
     data_file = Quantity(
@@ -233,14 +233,16 @@ class XRayDiffraction(XRayDiffractionWithSource, EntryData):
 
         with archive.m_context.raw_file(self.data_file) as file:
             xrd_dict = parse_and_convert_file(file.name)
-            self.intensity = xrd_dict['counts'] if xrd_dict['counts'] is not None else None
-            self.two_theta = xrd_dict['2Theta'] * ureg('degree') if xrd_dict['2Theta'] is not None else None
-            self.omega = xrd_dict['Omega'] * ureg('degree') if xrd_dict['Omega'] is not None else None
-            self.chi = xrd_dict['Chi'] * ureg('degree') if xrd_dict['Chi'] is not None else None
-            self.phi = xrd_dict['Phi'] * ureg('degree') if xrd_dict['Phi'] is not None else None
+            self.intensity = xrd_dict['detector'] if 'detector' in xrd_dict and xrd_dict['detector'] is not None else None
+            # self.intensity = xrd_dict['counts'] if 'counts' in xrd_dict and xrd_dict['counts'] is not None else None
+            # if self.intensity is None:
+            #     self.intensity = xrd_dict['detector'] if 'detector' in xrd_dict and xrd_dict['detector'] is not None else None
+            self.two_theta = xrd_dict['2Theta'] * ureg('degree') if '2Theta' in xrd_dict and xrd_dict['2Theta'] is not None else None
+            self.omega = xrd_dict['Omega'] * ureg('degree') if 'Omega' in xrd_dict and xrd_dict['Omega'] is not None else None
+            self.chi = xrd_dict['Chi'] * ureg('degree') if 'Chi' in xrd_dict and xrd_dict['Chi'] is not None else None
             if self.source is None:
                 self.source = XRayConventionalSource()
-            self.source.xray_tube_material = xrd_dict['metadata']['source']['anode_material'] if xrd_dict['metadata']['source']['anode_material'] is not None else None
+            self.source.xray_tube_material = xrd_dict['metadata']['source']['anode_material'] if 'anode_material' in xrd_dict['metadata']['source'] and xrd_dict['metadata']['source']['anode_material'] else None
             # self.source_peak_wavelength = xrd_dict['metadata']['wavelength']['kalpha_one']
             # self.kalpha_one = xrd_dict['kAlpha1']
             # self.kalpha_two = xrd_dict['kAlpha2']

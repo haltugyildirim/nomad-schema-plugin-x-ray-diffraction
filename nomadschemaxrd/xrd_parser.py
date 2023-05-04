@@ -1,5 +1,6 @@
+import re # for regular expressions
 import os  # for file path operations
-from lxml import etree as ET # for XML parsing
+import xml.etree.ElementTree as ET # for XML parsing
 from xrayutilities.io.panalytical_xml import XRDMLFile # for reading XRDML files
 
 class FileReader:
@@ -34,27 +35,35 @@ class PanalyticalXRDMLParser:
 
     def parse_metadata(self):
         '''Parses the metadata of the XRDML file.'''
-        with open(self.file_path, 'r') as file:
+
+        with open(self.file_path, 'r', encoding='utf-8') as file:
             content = file.read()
 
+        # Remove the XML encoding declaration if it exists
+        content = re.sub(r'<\?xml.*\?>', '', content)
+
         root = ET.fromstring(content)
-        xrd_measurement = root.find("{http://www.xrdml.com/XRDMeasurement/2.1}xrdMeasurement")
+
+        ns_version = root.tag.split("}")[0].strip("{")
+        ns = {'xrd': ns_version}    
+
+        xrd_measurement = root.find("xrd:xrdMeasurement", ns)
 
         metadata = {
-            # "diffractometer_system": root.find(".//{http://www.xrdml.com/XRDMeasurement/2.1}entry[@name='Diffractometer system']").text,
             "measurement_type": xrd_measurement.get("measurementType"),
             "sample_mode": xrd_measurement.get("sampleMode"),
             "source": {
-                "voltage": float(xrd_measurement.find(".//{http://www.xrdml.com/XRDMeasurement/2.1}tension").text),
-                "current": float(xrd_measurement.find(".//{http://www.xrdml.com/XRDMeasurement/2.1}current").text),
-                "kAlpha1": float(xrd_measurement.find(".//{http://www.xrdml.com/XRDMeasurement/2.1}kAlpha1").text),
-                "kAlpha2": float(xrd_measurement.find(".//{http://www.xrdml.com/XRDMeasurement/2.1}kAlpha2").text),
-                "anode_material": xrd_measurement.find(".//{http://www.xrdml.com/XRDMeasurement/2.1}anodeMaterial").text,
+                "voltage": float(xrd_measurement.find("xrd:incidentBeamPath/xrd:xRayTube/xrd:tension", ns).text) if xrd_measurement.find("xrd:incidentBeamPath/xrd:xRayTube/xrd:tension", ns) is not None else None,
+                "current": float(xrd_measurement.find("xrd:incidentBeamPath/xrd:xRayTube/xrd:current", ns).text) if xrd_measurement.find("xrd:incidentBeamPath/xrd:xRayTube/xrd:current", ns) is not None else None,
+                "kAlpha1": float(xrd_measurement.find("xrd:usedWavelength/xrd:kAlpha1", ns).text) if xrd_measurement.find("xrd:usedWavelength/xrd:kAlpha1", ns) is not None else None,
+                "kAlpha2": float(xrd_measurement.find("xrd:usedWavelength/xrd:kAlpha2", ns).text) if xrd_measurement.find("xrd:usedWavelength/xrd:kAlpha2", ns) is not None else None,
+                "anode_material": xrd_measurement.find("xrd:incidentBeamPath/xrd:xRayTube/xrd:anodeMaterial", ns).text if xrd_measurement.find("xrd:incidentBeamPath/xrd:xRayTube/xrd:anodeMaterial", ns) is not None else None,
             },
-            "scan_mode": xrd_measurement.find(".//{http://www.xrdml.com/XRDMeasurement/2.1}scan").get("mode"),
-            "scan_axis": xrd_measurement.find(".//{http://www.xrdml.com/XRDMeasurement/2.1}scan").get("scanAxis"),
-        }
 
+            "scan_mode": xrd_measurement.find("xrd:scan", ns).get("mode") if xrd_measurement.find("xrd:scan", ns) is not None else None,
+            "scan_axis": xrd_measurement.find("xrd:scan", ns).get("scanAxis") if xrd_measurement.find("xrd:scan", ns) is not None else None,
+        }
+        print(metadata)
         return metadata
 
 
@@ -67,6 +76,10 @@ class PanalyticalXRDMLParser:
         # Read the XRDML file using xrayutilities
         xrd_data = XRDMLFile(self.file_path)
         result = xrd_data.scan.ddict
+        print(result.keys())
+        print(f"counts: {result['counts']}")
+        print(f"detector: {result['detector']}")
+
 
         # Add the scanmotname, material, hkl to the dictionary
         result["scanmotname"] = xrd_data.scan.scanmotname
